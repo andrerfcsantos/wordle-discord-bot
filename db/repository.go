@@ -61,6 +61,54 @@ func (r *Repository) TrackChannel(channelId string) error {
 	return query.Error
 }
 
+type LeaderboardEntry struct {
+	Username string  `gorm:"column:user_name"`
+	AvgScore float64 `gorm:"column:avg_score"`
+	Count    int     `gorm:"column:count"`
+}
+
+func (r *Repository) Leaderboard(channelId string) ([]LeaderboardEntry, error) {
+	l := []LeaderboardEntry{}
+	query := r.db.
+		Raw(`
+		select
+			a.user_name, trunc(avg(a.score), 2) as "avg_score", count(*) as "count"
+		from 
+			attempts a
+		where 
+			a.channel_id = ?
+		group by
+			a.user_name
+		order by 
+			2 desc;
+		`, channelId).
+		Scan(&l)
+
+	return l, query.Error
+}
+
+type UserScore struct {
+	UserName string  `gorm:"column:user_name"`
+	Score    float64 `gorm:"column:score"`
+}
+
+func (r *Repository) LeaderboardForDay(channelId string, day int) ([]UserScore, error) {
+	l := []UserScore{}
+	query := r.db.
+		Raw(`
+		select
+			a.user_name, score
+		from 
+			attempts a
+		where 
+			a."day" = ? and a.channel_id = ?
+		order by 
+			2 desc;`, day, channelId).
+		Scan(&l)
+
+	return l, query.Error
+}
+
 func (r *Repository) SaveAttempt(attempt Attempt) error {
 	return r.db.
 		Clauses(clause.OnConflict{

@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"text/tabwriter"
 	"unicode/utf8"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/andrerfcsantos/wordle-discord-bot/db"
 	"github.com/andrerfcsantos/wordle-discord-bot/wordle"
@@ -78,6 +81,11 @@ func (b *WordleBot) setupApplicationCommands() error {
 				Type:        discordgo.ApplicationCommandOptionSubCommand,
 				Description: "Marks a channel to be tracked for past and future wordle messages.",
 			},
+			{
+				Name:        "leaderboard",
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Description: "Displays the leaderboard for the current channel.",
+			},
 		},
 	}
 
@@ -88,7 +96,7 @@ func (b *WordleBot) setupApplicationCommands() error {
 			command,
 		)
 		if err != nil {
-			fmt.Printf("creating application command for guild %q: %v", guild, err)
+			log.Errorf("creating application command for guild %q: %v\n", guild, err)
 		}
 
 		if guild == "" {
@@ -117,7 +125,7 @@ func (b *WordleBot) ApplicationCommandHandler(s *discordgo.Session, i *discordgo
 	}
 
 	if err != nil {
-		fmt.Printf("Error responding to interaction: %v", err)
+		log.Errorf("responding to interaction: %v\n", err)
 	}
 }
 
@@ -162,7 +170,7 @@ func (b *WordleBot) HandleTrackInteraction(s *discordgo.Session, i *discordgo.In
 		&discordgo.WebhookEdit{
 			Content: message + "\n" +
 				fmt.Sprintf("📩 Import of old messages is now completed! %d messages were processed "+
-					"of which %d were wordle copy pastas", procResult.TotalMessages, procResult.WordleMessages),
+					"of which %d were wordle copy/pastes", procResult.TotalMessages, procResult.WordleMessages),
 		},
 	)
 	if err != nil {
@@ -172,6 +180,44 @@ func (b *WordleBot) HandleTrackInteraction(s *discordgo.Session, i *discordgo.In
 }
 
 func (b *WordleBot) HandleLeaderboardInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+	var builder strings.Builder
+
+	tabw := tabwriter.NewWriter(&builder, 2, 2, 2, ' ', tabwriter.TabIndent)
+
+	fmt.Fprintf(tabw, "Name\tAvg. Score\tCount\n")
+	entries, err := b.repository.Leaderboard(i.ChannelID)
+	if err != nil {
+		log.Errorf("Error handling leaderboard interaction: %v", err)
+
+		b.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "There was a problem processing this request, sorry :(",
+			},
+		})
+
+		return err
+	}
+
+	for _, entry := range entries {
+		fmt.Fprintf(tabw, "%s\t%.2f\t%d\n", entry.Username, entry.AvgScore, entry.Count)
+	}
+
+	tabw.Flush()
+	table := builder.String()
+
+	err = b.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: "Here's the current leaderboard:\n" +
+				"```\n" + table + "\n```",
+		},
+	})
+
+	return err
+}
+
+func (b *WordleBot) HandleDayInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) error {
 	err := b.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponsePong,
 	})
@@ -203,7 +249,7 @@ func (b *WordleBot) MessageCreateHandler(s *discordgo.Session, m *discordgo.Mess
 
 	err = b.session.MessageReactionAdd(m.ChannelID, m.ID, reaction)
 	if err != nil {
-		fmt.Printf("failed to add reaction: %s\n", err)
+		log.Errorf("failed to add reaction: %v\n", err)
 	}
 }
 

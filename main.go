@@ -1,13 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
 	"github.com/andrerfcsantos/wordle-discord-bot/wordlebot"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -20,11 +20,18 @@ func main() {
 		panic("error creating new bot: " + err.Error())
 	}
 
+	file, err := os.OpenFile("logs.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err == nil {
+		log.SetOutput(file)
+	} else {
+		log.Info("Failed to log to file, using default stderr")
+	}
+
 	// Cleanly close down the Discord session.
 	defer bot.Close()
 
 	// Wait here until CTRL-C or other term signal is received.
-	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
+	log.Info("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sc
