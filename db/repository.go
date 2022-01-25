@@ -112,8 +112,7 @@ func (r *Repository) LeaderboardForDay(channelId string, day int) ([]UserScore, 
 func (r *Repository) SaveAttempt(attempt Attempt) error {
 	return r.db.
 		Clauses(clause.OnConflict{
-			OnConstraint: "attempts_pk",
-			DoNothing:    true,
+			UpdateAll: true,
 		}).
 		Table("attempts").
 		Create(&attempt).Error
