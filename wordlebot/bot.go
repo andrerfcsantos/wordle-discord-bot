@@ -237,17 +237,11 @@ func (b *WordleBot) MessageCreateHandler(s *discordgo.Session, m *discordgo.Mess
 
 	err := b.saveWordleMessage(m.Message, attempt)
 	if err != nil {
+		log.Errorf("failed to save wordle message: %v\n", err)
 		return
 	}
 
-	var reaction string
-	if attempt.Success {
-		reaction = "✅"
-	} else {
-		reaction = "❌"
-	}
-
-	err = b.session.MessageReactionAdd(m.ChannelID, m.ID, reaction)
+	err = b.session.MessageReactionAdd(m.ChannelID, m.ID, "✅")
 	if err != nil {
 		log.Errorf("failed to add reaction: %v\n", err)
 	}
@@ -279,6 +273,12 @@ func (b *WordleBot) ProcessChannelMessages(channelId string) (*ProcessResult, er
 			if err != nil {
 				return nil, fmt.Errorf("saving wordle message: %v", err)
 			}
+
+			err = b.session.MessageReactionAdd(m.ChannelID, m.ID, "✅")
+			if err != nil {
+				log.Errorf("failed to add reaction: %v\n", err)
+			}
+
 			result.WordleMessages++
 		}
 
