@@ -46,6 +46,11 @@ func ParseCopyPaste(paste string) (*Attempt, bool) {
 	attempts := make([]string, 0)
 	for _, attemptLine := range attemptLines {
 		l := strings.TrimSpace(attemptLine)
+
+		if l == "" {
+			continue
+		}
+
 		if utf8.RuneCountInString(l) != 5 {
 			return nil, false
 		}
