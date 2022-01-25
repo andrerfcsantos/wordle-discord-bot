@@ -298,6 +298,7 @@ func (b *WordleBot) saveWordleMessage(m *discordgo.Message, attempt *wordle.Atte
 	}
 
 	err = b.repository.SaveAttempt(db.Attempt{
+		MessageId:    m.ID,
 		ChannelId:    m.ChannelID,
 		UserId:       m.Author.ID,
 		Day:          attempt.Day,
