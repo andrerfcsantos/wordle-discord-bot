@@ -184,7 +184,7 @@ func (b *WordleBot) HandleLeaderboardInteraction(s *discordgo.Session, i *discor
 
 	tabw := tabwriter.NewWriter(&builder, 2, 2, 2, ' ', tabwriter.TabIndent)
 
-	fmt.Fprintf(tabw, "Name\tAvg. Score\tCount\n")
+	fmt.Fprintf(tabw, "Name\tAvg. Score\tAvg. Attempts\tTotal Points\tGames Played\n")
 	entries, err := b.repository.Leaderboard(i.ChannelID)
 	if err != nil {
 		log.Errorf("Error handling leaderboard interaction: %v", err)
@@ -200,7 +200,8 @@ func (b *WordleBot) HandleLeaderboardInteraction(s *discordgo.Session, i *discor
 	}
 
 	for _, entry := range entries {
-		fmt.Fprintf(tabw, "%s\t%.2f\t%d\n", entry.Username, entry.AvgScore, entry.Count)
+		fmt.Fprintf(tabw, "%s\t%.2f\t%.2f\t%d\t%d\n",
+			entry.Username, entry.AvgScore, entry.AvgAttempts, entry.TotalPoints, entry.Count)
 	}
 
 	tabw.Flush()

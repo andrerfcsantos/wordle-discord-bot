@@ -62,9 +62,11 @@ func (r *Repository) TrackChannel(channelId string) error {
 }
 
 type LeaderboardEntry struct {
-	Username string  `gorm:"column:user_name"`
-	AvgScore float64 `gorm:"column:avg_score"`
-	Count    int     `gorm:"column:count"`
+	Username    string  `gorm:"column:user_name"`
+	AvgScore    float64 `gorm:"column:avg_score"`
+	AvgAttempts float64 `gorm:"column:avg_attempts"`
+	TotalPoints int     `gorm:"column:total_points"`
+	Count       int     `gorm:"column:count"`
 }
 
 func (r *Repository) Leaderboard(channelId string) ([]LeaderboardEntry, error) {
@@ -72,7 +74,7 @@ func (r *Repository) Leaderboard(channelId string) ([]LeaderboardEntry, error) {
 	query := r.db.
 		Raw(`
 		select
-			a.user_name, trunc(avg(a.score), 2) as "avg_score", count(*) as "count"
+			a.user_name, trunc(avg(a.score), 3) as "avg_score", trunc(avg(a.attempts), 3) "avg_attempts", sum(score) "total_points", count(*) as "count"
 		from 
 			attempts a
 		where 
