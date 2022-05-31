@@ -95,6 +95,38 @@ type UserScore struct {
 	Score    float64 `gorm:"column:score"`
 }
 
+func (r *Repository) AttemptForMessage(channelId string, messageId string) (*Attempt, error) {
+	a := Attempt{}
+	query := r.db.
+		Raw(`
+		select
+			*
+		from 
+			attempts a
+		where 
+			a.channel_id = ? and a.message_id = ?;`,
+			channelId, messageId).Scan(&a)
+
+	return &a, query.Error
+}
+
+func (r *Repository) DeleteAttemptForMessage(channelId string, messageId string) (bool, error) {
+	query := r.db.
+		Exec(`
+		delete from
+			attempts a
+		where 
+			a.channel_id = ? and a.message_id = ?;`,
+			channelId, messageId)
+
+	var deleted bool
+	if query.RowsAffected != 0 {
+		deleted = true
+	}
+
+	return deleted, query.Error
+}
+
 func (r *Repository) LeaderboardForDay(channelId string, day int) ([]UserScore, error) {
 	l := []UserScore{}
 	query := r.db.

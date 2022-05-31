@@ -105,6 +105,8 @@ func (b *WordleBot) setupApplicationCommands() error {
 	}
 
 	b.session.AddHandler(b.ApplicationCommandHandler)
+	b.session.AddHandler(b.DeleteMessageHandler)
+	b.session.AddHandler(b.UpdateMessageHandler)
 
 	return nil
 }
@@ -244,6 +246,53 @@ func (b *WordleBot) MessageCreateHandler(s *discordgo.Session, m *discordgo.Mess
 	err = b.session.MessageReactionAdd(m.ChannelID, m.ID, "✅")
 	if err != nil {
 		log.Errorf("failed to add reaction: %v\n", err)
+	}
+}
+
+func (b *WordleBot) DeleteMessageHandler(s *discordgo.Session, m *discordgo.MessageDelete) {
+	tracked, _ := b.repository.IsTrackedChannel(m.ChannelID)
+	if !tracked {
+		return
+	}
+
+	_, err := b.repository.AttemptForMessage(m.ChannelID, m.ID)
+	if err != nil {
+		log.Errorf("failed to get attempt for message: %v\n", err)
+		return
+	}
+
+	_, err = b.repository.DeleteAttemptForMessage(m.ChannelID, m.ID)
+	if err != nil {
+		log.Errorf("failed to delete attempt: %v\n", err)
+	}
+}
+
+func (b *WordleBot) UpdateMessageHandler(s *discordgo.Session, m *discordgo.MessageUpdate) {
+	tracked, _ := b.repository.IsTrackedChannel(m.ChannelID)
+	if !tracked {
+		return
+	}
+
+	a, err := b.repository.AttemptForMessage(m.ChannelID, m.ID)
+	if err != nil {
+		log.Errorf("failed to get attempt for message: %v\n", err)
+		return
+	}
+
+	attempt, ok := wordle.ParseCopyPaste(m.Content)
+
+	if a.MessageId == m.ID && !ok {
+		_, err := b.repository.DeleteAttemptForMessage(m.ChannelID, m.ID)
+		if err != nil {
+			log.Errorf("failed to delete attempt: %v\n", err)
+		}
+	} else {
+		if ok {
+			err := b.saveWordleMessage(m.Message, attempt)
+			if err != nil {
+				log.Errorf("failed to save wordle message: %v\n", err)
+			}
+		}
 	}
 }
 
