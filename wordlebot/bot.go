@@ -165,7 +165,6 @@ func (b *WordleBot) HandleTrackInteraction(s *discordgo.Session, i *discordgo.In
 	}
 
 	_, err = b.session.InteractionResponseEdit(
-		b.config.AppID,
 		i.Interaction,
 		&discordgo.WebhookEdit{
 			Content: message + "\n" +
@@ -310,6 +309,7 @@ func (b *WordleBot) saveWordleMessage(m *discordgo.Message, attempt *wordle.Atte
 		AttemptsJson: string(attemptsJson),
 		PostedAt:     m.Timestamp,
 		Score:        attempt.Score,
+		HardMode:     attempt.HardMode,
 	})
 
 	if err != nil {

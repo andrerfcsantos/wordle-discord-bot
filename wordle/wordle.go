@@ -14,12 +14,13 @@ type Attempt struct {
 	Success        bool
 	AttemptsDetail []string
 	Score          int
+	HardMode       bool
 }
 
 var wordleRegex *regexp.Regexp
 
 func init() {
-	wordleRegex = regexp.MustCompile(`(?si)Wordle (\d+) (\d|X)\/(\d)\n\n((⬜|🟩|🟨|⬛){5}\n?)+`)
+	wordleRegex = regexp.MustCompile(`(?si)Wordle (\d+) (\d|X)\/(\d)(\*?)\n\n((⬜|🟩|🟨|⬛){5}\n?)+`)
 }
 
 func ParseCopyPaste(paste string) (*Attempt, bool) {
@@ -38,6 +39,11 @@ func ParseCopyPaste(paste string) (*Attempt, bool) {
 		nAttempts, _ = strconv.Atoi(matches[2])
 		base := (maxAttempts + 1) - nAttempts
 		score = base * base
+	}
+
+	var hardMode bool
+	if matches[4] == "*" {
+		hardMode = true
 	}
 
 	triesStr := strings.Split(matches[0], "\n\n")[1]
@@ -68,5 +74,6 @@ func ParseCopyPaste(paste string) (*Attempt, bool) {
 		Success:        success,
 		AttemptsDetail: attempts,
 		Score:          score,
+		HardMode:       hardMode,
 	}, true
 }

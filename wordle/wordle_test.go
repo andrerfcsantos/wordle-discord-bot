@@ -122,6 +122,26 @@ Bot, be good`,
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "valid paste in hard mode",
+			paste: `Wordle 219 2/6*
+
+⬛⬛⬛⬛⬛
+🟩🟩🟩🟩🟩`,
+			want: &wordle.Attempt{
+				Day:         219,
+				MaxAttempts: 6,
+				Attempts:    2,
+				Success:     true,
+				AttemptsDetail: []string{
+					"⬛⬛⬛⬛⬛",
+					"🟩🟩🟩🟩🟩",
+				},
+				HardMode: true,
+				Score:    25,
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -162,6 +182,9 @@ func attemptsEqual(a, b *wordle.Attempt) bool {
 		return false
 	}
 	if a.Success != b.Success {
+		return false
+	}
+	if a.HardMode != b.HardMode {
 		return false
 	}
 	if len(a.AttemptsDetail) != len(b.AttemptsDetail) {

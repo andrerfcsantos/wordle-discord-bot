@@ -60,4 +60,16 @@
         </createTable>
     </changeSet>
 
+    <changeSet author="wordle" id="0002-hard-mode">
+
+        <addColumn tableName="attempts">
+            <column name="hard_mode" type="BOOLEAN" defaultValueBoolean="false"/>
+        </addColumn>
+
+        <update tableName="attempts">
+            <column name="hard_mode" value="false" />
+        </update>
+
+    </changeSet>
+
 </databaseChangeLog>

@@ -22,6 +22,7 @@ type Attempt struct {
 	AttemptsJson string    `gorm:"column:attempts_json"`
 	PostedAt     time.Time `gorm:"column:posted_at"`
 	Score        int       `gorm:"column:score"`
+	HardMode     bool      `gorm:"column:hard_mode"`
 }
 
 type TrackedChannel struct {
