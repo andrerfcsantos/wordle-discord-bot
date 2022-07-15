@@ -80,10 +80,9 @@ func (r *Repository) TrackChannel(channelId string) error {
 
 type LeaderboardEntry struct {
 	Username    string  `gorm:"column:user_name"`
-	AvgScore    float64 `gorm:"column:avg_score"`
+	TotalScore  float64 `gorm:"column:total_score"`
 	AvgAttempts float64 `gorm:"column:avg_attempts"`
-	TotalPoints int     `gorm:"column:total_points"`
-	Count       int     `gorm:"column:count"`
+	Played      int     `gorm:"column:played"`
 }
 
 func (r *Repository) Leaderboard(channelId string) ([]LeaderboardEntry, error) {
@@ -91,15 +90,28 @@ func (r *Repository) Leaderboard(channelId string) ([]LeaderboardEntry, error) {
 	query := r.db.
 		Raw(`
 		select
-			a.user_name, trunc(avg(a.score), 3) as "avg_score", trunc(avg(a.attempts), 3) "avg_attempts", sum(score) "total_points", count(*) as "count"
-		from 
-			attempts a
-		where 
-			a.channel_id = ?
-		group by
-			a.user_name
-		order by 
-			2 desc;
+			a.user_name,
+			truc(sum(a.new_score),2) as "total_score",
+			trunc(avg(a.attempts), 3) "avg_attempts",
+			count(*) as "played"
+		from (
+			select
+				user_name,
+				attempts,
+				(30 - ((select date_part as value from DATE_PART('day', now() - '2021-06-19')) - day) )/30 * (
+				case
+					when a.success then (7-attempts)*(7-attempts)+2
+					else 2
+				end) new_score
+			from
+				attempts a
+			where
+				channel_id = ? and 
+				day > (DATE_PART('day', now() - '2021-06-19') -30)
+			order by day desc
+		) a
+		group by a.user_name
+		order by 2 desc
 		`, channelId).
 		Scan(&l)
 

@@ -32,13 +32,11 @@ func ParseCopyPaste(paste string) (*Attempt, bool) {
 	day, _ := strconv.Atoi(matches[1])
 	maxAttempts, _ := strconv.Atoi(matches[3])
 
-	success, nAttempts, score := true, 6, 0
+	success, nAttempts := true, 6
 	if matches[2] == "X" {
 		success = false
 	} else {
 		nAttempts, _ = strconv.Atoi(matches[2])
-		base := (maxAttempts + 1) - nAttempts
-		score = base * base
 	}
 
 	var hardMode bool
@@ -73,7 +71,6 @@ func ParseCopyPaste(paste string) (*Attempt, bool) {
 		Attempts:       nAttempts,
 		Success:        success,
 		AttemptsDetail: attempts,
-		Score:          score,
 		HardMode:       hardMode,
 	}, true
 }
