@@ -91,8 +91,8 @@ func (r *Repository) Leaderboard(channelId string) ([]LeaderboardEntry, error) {
 		Raw(`
 		select
 			a.user_name,
-			trunc(sum(a.new_score),2) as "total_score",
-			trunc(avg(a.attempts), 3) "avg_attempts",
+			sum(a.new_score) as "total_score",
+			avg(a.attempts) as "avg_attempts",
 			count(*) as "played"
 		from (
 			select
