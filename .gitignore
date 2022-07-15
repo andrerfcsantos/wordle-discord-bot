@@ -27,3 +27,5 @@ wordle-discord-bot
 liquibase/*.properties
 *.env
 *.log
+
+.idea
