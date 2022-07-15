@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"time"
 
@@ -31,6 +32,21 @@ type TrackedChannel struct {
 
 type Repository struct {
 	db *gorm.DB
+}
+
+func (r *Repository) Database() *gorm.DB {
+	db, err := r.db.DB()
+	if err != nil {
+		log.Errorf("getting database session in Database(): %v", err)
+	}
+
+	errPing := db.Ping()
+	for errPing != nil {
+		log.Errorf("could not ping database in Database(): %v", err)
+		time.Sleep(time.Second * 5)
+		errPing = db.Ping()
+	}
+	return r.db
 }
 
 func (r *Repository) IsTrackedChannel(channelId string) (bool, error) {
@@ -153,10 +169,7 @@ func (r *Repository) SaveAttempt(attempt Attempt) error {
 		Create(&attempt).Error
 }
 
-func NewRepository() (*Repository, error) {
-	var err error
-	var repo Repository
-
+func getConnection() (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
 		os.Getenv("WORDLE_DB_HOST"),
 		os.Getenv("WORDLE_DB_USER"),
@@ -164,7 +177,19 @@ func NewRepository() (*Repository, error) {
 		os.Getenv("WORDLE_DB_NAME"),
 		os.Getenv("WORDLE_DB_PORT"))
 
-	repo.db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("getting database session: %w", err)
+	}
+
+	return db, nil
+}
+
+func NewRepository() (*Repository, error) {
+	var err error
+	var repo Repository
+
+	repo.db, err = getConnection()
 	if err != nil {
 		return nil, fmt.Errorf("getting database session: %w", err)
 	}
