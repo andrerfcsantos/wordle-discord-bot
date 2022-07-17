@@ -2,234 +2,30 @@ package db
 
 import (
 	"fmt"
-	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	log "github.com/sirupsen/logrus"
+	"gorm.io/driver/postgres"
 	"os"
 	"time"
 
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
-
-type Attempt struct {
-	ChannelId    string    `gorm:"primary_key;column:channel_id"`
-	UserId       string    `gorm:"primary_key;column:user_id"`
-	Day          int       `gorm:"primary_key;column:day"`
-	MessageId    string    `gorm:"column:message_id"`
-	UserName     string    `gorm:"column:user_name"`
-	Attempts     int       `gorm:"column:attempts"`
-	MaxAttempts  int       `gorm:"column:max_attempts"`
-	Success      bool      `gorm:"column:success"`
-	AttemptsJson string    `gorm:"column:attempts_json"`
-	PostedAt     time.Time `gorm:"column:posted_at"`
-	HardMode     bool      `gorm:"column:hard_mode"`
-}
-
-type TrackedChannel struct {
-	ChannelId string `gorm:"primary_key;column:channel_id"`
-}
 
 type Repository struct {
 	db *gorm.DB
 }
 
-func (r *Repository) Database() *gorm.DB {
-	db, err := r.db.DB()
+func NewRepository() (*Repository, error) {
+	var err error
+	var repo Repository
+
+	repo.db, err = getConnection()
 	if err != nil {
-		log.Errorf("getting database session in Database(): %v", err)
+		return nil, fmt.Errorf("getting database session: %w", err)
 	}
 
-	errPing := db.Ping()
-	for errPing != nil {
-		log.Errorf("could not ping database in Database(): %v", err)
-		time.Sleep(time.Second * 5)
-		errPing = db.Ping()
-	}
-	return r.db
-}
-
-func (r *Repository) RunMigrations() error {
-
-	var migrationPath = "db/migrations"
-	switch os.Getenv("WORDLE_ENVIRONMENT") {
-	case "dev":
-		migrationPath = "db/migrations/dev"
-	}
-
-	err := r.runMigrations(migrationPath)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *Repository) runMigrations(migrationPath string) error {
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		os.Getenv("WORDLE_DB_USER"),
-		os.Getenv("WORDLE_DB_PASSWORD"),
-		os.Getenv("WORDLE_DB_HOST"),
-		os.Getenv("WORDLE_DB_PORT"),
-		os.Getenv("WORDLE_DB_NAME"),
-	)
-
-	m, err := migrate.New(
-		fmt.Sprintf("file://%s", migrationPath),
-		dsn,
-	)
-	if err != nil {
-		return fmt.Errorf("creating migrations: %w", err)
-	}
-
-	if err := m.Up(); err != nil {
-		return fmt.Errorf("running up migrations: %w", err)
-	}
-
-	sError, dberror := m.Close()
-	if sError != nil {
-		return fmt.Errorf("closing database: %w", sError)
-	}
-
-	if dberror != nil {
-		return fmt.Errorf("closing database: %w", dberror)
-	}
-
-	return nil
-}
-
-func (r *Repository) IsTrackedChannel(channelId string) (bool, error) {
-	var count int64
-
-	query := r.Database().
-		Table("tracked_channels").
-		Where("channel_id = ?", channelId).
-		Count(&count)
-
-	if query.Error != nil {
-		return false, fmt.Errorf("checking tracked channel: %w", query.Error)
-	}
-
-	return count > 0, nil
-}
-
-func (r *Repository) TrackChannel(channelId string) error {
-	query := r.Database().
-		Clauses(clause.OnConflict{
-			OnConstraint: "tracked_channels_pk",
-			DoNothing:    true,
-		}).
-		Table("tracked_channels").
-		Create(&TrackedChannel{
-			ChannelId: channelId,
-		})
-
-	return query.Error
-}
-
-type LeaderboardEntry struct {
-	Username    string  `gorm:"column:user_name"`
-	TotalScore  float64 `gorm:"column:total_score"`
-	AvgAttempts float64 `gorm:"column:avg_attempts"`
-	Played      int     `gorm:"column:played"`
-}
-
-func (r *Repository) Leaderboard(channelId string) ([]LeaderboardEntry, error) {
-	var l []LeaderboardEntry
-	query := r.Database().
-		Raw(`
-		select
-			a.user_name,
-			sum(a.new_score) as "total_score",
-			avg(a.attempts) as "avg_attempts",
-			count(*) as "played"
-		from (
-			select
-				user_name,
-				attempts,
-				(30 - ((select date_part as value from DATE_PART('day', now() - '2021-06-19')) - day) )/30 * (
-				case
-					when a.success then (7-attempts)*(7-attempts)+2
-					else 2
-				end) new_score
-			from
-				attempts a
-			where
-				channel_id = ? and 
-				day > (DATE_PART('day', now() - '2021-06-19') -30)
-			order by day desc
-		) a
-		group by a.user_name
-		order by 2 desc
-		`, channelId).
-		Scan(&l)
-
-	return l, query.Error
-}
-
-type UserScore struct {
-	UserName string  `gorm:"column:user_name"`
-	Score    float64 `gorm:"column:score"`
-}
-
-func (r *Repository) AttemptForMessage(channelId string, messageId string) (*Attempt, error) {
-	a := Attempt{}
-	query := r.Database().
-		Raw(`
-		select
-			*
-		from 
-			attempts a
-		where 
-			a.channel_id = ? and a.message_id = ?;`,
-			channelId, messageId).Scan(&a)
-
-	return &a, query.Error
-}
-
-func (r *Repository) DeleteAttemptForMessage(channelId string, messageId string) (bool, error) {
-	query := r.Database().
-		Exec(`
-		delete from
-			attempts a
-		where 
-			a.channel_id = ? and a.message_id = ?;`,
-			channelId, messageId)
-
-	var deleted bool
-	if query.RowsAffected != 0 {
-		deleted = true
-	}
-
-	return deleted, query.Error
-}
-
-func (r *Repository) LeaderboardForDay(channelId string, day int) ([]UserScore, error) {
-	var l []UserScore
-	query := r.Database().
-		Raw(`
-		select
-			a.user_name, score
-		from 
-			attempts a
-		where 
-			a."day" = ? and a.channel_id = ?
-		order by 
-			2 desc;`, day, channelId).
-		Scan(&l)
-
-	return l, query.Error
-}
-
-func (r *Repository) SaveAttempt(attempt Attempt) error {
-	return r.Database().
-		Clauses(clause.OnConflict{
-			UpdateAll: true,
-		}).
-		Table("attempts").
-		Create(&attempt).Error
+	return &repo, nil
 }
 
 func getConnection() (*gorm.DB, error) {
@@ -248,14 +44,17 @@ func getConnection() (*gorm.DB, error) {
 	return db, nil
 }
 
-func NewRepository() (*Repository, error) {
-	var err error
-	var repo Repository
-
-	repo.db, err = getConnection()
+func (r *Repository) Database() *gorm.DB {
+	db, err := r.db.DB()
 	if err != nil {
-		return nil, fmt.Errorf("getting database session: %w", err)
+		log.Errorf("getting database session in Database(): %v", err)
 	}
 
-	return &repo, nil
+	errPing := db.Ping()
+	for errPing != nil {
+		log.Errorf("could not ping database in Database(): %v", err)
+		time.Sleep(time.Second * 5)
+		errPing = db.Ping()
+	}
+	return r.db
 }
