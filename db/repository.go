@@ -2,6 +2,9 @@ package db
 
 import (
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"time"
@@ -22,7 +25,6 @@ type Attempt struct {
 	Success      bool      `gorm:"column:success"`
 	AttemptsJson string    `gorm:"column:attempts_json"`
 	PostedAt     time.Time `gorm:"column:posted_at"`
-	Score        int       `gorm:"column:score"`
 	HardMode     bool      `gorm:"column:hard_mode"`
 }
 
@@ -49,10 +51,59 @@ func (r *Repository) Database() *gorm.DB {
 	return r.db
 }
 
+func (r *Repository) RunMigrations() error {
+
+	var migrationPath = "db/migrations"
+	switch os.Getenv("WORDLE_ENVIRONMENT") {
+	case "dev":
+		migrationPath = "db/migrations/dev"
+	}
+
+	err := r.runMigrations(migrationPath)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Repository) runMigrations(migrationPath string) error {
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		os.Getenv("WORDLE_DB_USER"),
+		os.Getenv("WORDLE_DB_PASSWORD"),
+		os.Getenv("WORDLE_DB_HOST"),
+		os.Getenv("WORDLE_DB_PORT"),
+		os.Getenv("WORDLE_DB_NAME"),
+	)
+
+	m, err := migrate.New(
+		fmt.Sprintf("file://%s", migrationPath),
+		dsn,
+	)
+	if err != nil {
+		return fmt.Errorf("creating migrations: %w", err)
+	}
+
+	if err := m.Up(); err != nil {
+		return fmt.Errorf("running up migrations: %w", err)
+	}
+
+	sError, dberror := m.Close()
+	if sError != nil {
+		return fmt.Errorf("closing database: %w", sError)
+	}
+
+	if dberror != nil {
+		return fmt.Errorf("closing database: %w", dberror)
+	}
+
+	return nil
+}
+
 func (r *Repository) IsTrackedChannel(channelId string) (bool, error) {
 	var count int64
 
-	query := r.db.
+	query := r.Database().
 		Table("tracked_channels").
 		Where("channel_id = ?", channelId).
 		Count(&count)
@@ -65,7 +116,7 @@ func (r *Repository) IsTrackedChannel(channelId string) (bool, error) {
 }
 
 func (r *Repository) TrackChannel(channelId string) error {
-	query := r.db.
+	query := r.Database().
 		Clauses(clause.OnConflict{
 			OnConstraint: "tracked_channels_pk",
 			DoNothing:    true,
@@ -86,8 +137,8 @@ type LeaderboardEntry struct {
 }
 
 func (r *Repository) Leaderboard(channelId string) ([]LeaderboardEntry, error) {
-	l := []LeaderboardEntry{}
-	query := r.db.
+	var l []LeaderboardEntry
+	query := r.Database().
 		Raw(`
 		select
 			a.user_name,
@@ -125,7 +176,7 @@ type UserScore struct {
 
 func (r *Repository) AttemptForMessage(channelId string, messageId string) (*Attempt, error) {
 	a := Attempt{}
-	query := r.db.
+	query := r.Database().
 		Raw(`
 		select
 			*
@@ -139,7 +190,7 @@ func (r *Repository) AttemptForMessage(channelId string, messageId string) (*Att
 }
 
 func (r *Repository) DeleteAttemptForMessage(channelId string, messageId string) (bool, error) {
-	query := r.db.
+	query := r.Database().
 		Exec(`
 		delete from
 			attempts a
@@ -156,8 +207,8 @@ func (r *Repository) DeleteAttemptForMessage(channelId string, messageId string)
 }
 
 func (r *Repository) LeaderboardForDay(channelId string, day int) ([]UserScore, error) {
-	l := []UserScore{}
-	query := r.db.
+	var l []UserScore
+	query := r.Database().
 		Raw(`
 		select
 			a.user_name, score
@@ -173,7 +224,7 @@ func (r *Repository) LeaderboardForDay(channelId string, day int) ([]UserScore, 
 }
 
 func (r *Repository) SaveAttempt(attempt Attempt) error {
-	return r.db.
+	return r.Database().
 		Clauses(clause.OnConflict{
 			UpdateAll: true,
 		}).

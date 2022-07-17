@@ -13,7 +13,6 @@ type Attempt struct {
 	Attempts       int
 	Success        bool
 	AttemptsDetail []string
-	Score          int
 	HardMode       bool
 }
 

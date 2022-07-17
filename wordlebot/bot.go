@@ -56,6 +56,11 @@ func New(config *Config) (*WordleBot, error) {
 		return nil, fmt.Errorf("creating bot DB repository: %w", err)
 	}
 
+	err = bot.repository.RunMigrations()
+	if err != nil {
+		return nil, fmt.Errorf("migrating database: %w", err)
+	}
+
 	return &bot, nil
 }
 
