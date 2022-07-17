@@ -9,8 +9,8 @@ services:
       - WORDLE_DB_HOST=wordle-db
       - WORDLE_DB_PORT=5432
       - WORDLE_DB_NAME=postgres
-      - WORDLE_DISCORD_BOT_APP_ID=xxxx
-      - WORDLE_DISCORD_BOT_TOKEN=xxxx
+      - WORDLE_DISCORD_BOT_APP_ID=<insert_your_bot_app_id_here>
+      - WORDLE_DISCORD_BOT_TOKEN=<insert_your_bot_token_here>
       - WORDLE_ENVIRONMENT=dev
     depends_on:
       - wordle-db
