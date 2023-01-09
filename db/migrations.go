@@ -2,14 +2,14 @@ package db
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"os"
 )
 
 func (r *Repository) RunMigrations() error {
-
-	var migrationPath = "db/migrations"
+	migrationPath := "db/migrations"
 	switch os.Getenv("WORDLE_ENVIRONMENT") {
 	case "dev":
 		migrationPath = "db/migrations/dev"
@@ -24,7 +24,6 @@ func (r *Repository) RunMigrations() error {
 }
 
 func (r *Repository) runMigrations(migrationPath string) error {
-
 	database, err := r.db.DB()
 	if err != nil {
 		return fmt.Errorf("getting sql.DB for migrations: %v", err)
@@ -40,13 +39,12 @@ func (r *Repository) runMigrations(migrationPath string) error {
 		"postgres",
 		driver,
 	)
-
 	if err != nil {
 		return fmt.Errorf("creating migrate: %v", err)
 	}
 
 	err = m.Up()
-	if err != nil {
+	if err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("running migrations: %v", err)
 	}
 
